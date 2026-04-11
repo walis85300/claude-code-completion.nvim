@@ -123,14 +123,14 @@ function scanSkillDir(dir: string, source: Skill["source"], pluginName?: string)
         } else if (st.isDirectory()) {
           // Nested layout: skills/<name>/SKILL.md
           const skillFile = join(entryPath, "SKILL.md");
-          if (existsSync(skillFile) && statSync(skillFile).isFile()) {
+          try { if (statSync(skillFile).isFile()) {
             const content = readFileSync(skillFile, "utf-8");
             const fm = parseFrontmatter(content);
             if (fm["user-invocable"] === "false") continue;
             const name = fm.name || entry; // directory name as fallback
             const description = fm.description || "";
             skills.push({ name, description, source, ...(pluginName ? { plugin: pluginName } : {}) });
-          }
+          } } catch { /* SKILL.md not found */ }
         }
       } catch {
         // skip unreadable entries
@@ -236,11 +236,12 @@ function main() {
     skills: allSkills,
   };
 
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  const content = JSON.stringify(manifest, null, 2);
+  writeFileSync(manifestPath, content);
 
-  // Also write to a "latest" symlink for easy discovery
+  // Also write a latest copy for easy discovery
   const latestPath = join(tmpdir(), "claude-skills-latest.json");
-  writeFileSync(latestPath, JSON.stringify(manifest, null, 2));
+  writeFileSync(latestPath, content);
 }
 
 main();

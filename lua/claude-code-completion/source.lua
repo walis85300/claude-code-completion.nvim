@@ -3,6 +3,14 @@
 --- @class blink.cmp.Source
 local source = {}
 
+local COMPLETION_KIND_KEYWORD = 14
+
+--- Resolve CompletionItemKind.Keyword once at load time.
+local ok, types = pcall(require, "blink.cmp.types")
+if ok and types and types.CompletionItemKind then
+  COMPLETION_KIND_KEYWORD = types.CompletionItemKind.Keyword
+end
+
 function source.new(opts)
   local self = setmetatable({}, { __index = source })
   self.opts = opts or {}
@@ -11,9 +19,7 @@ end
 
 --- Only enable in Claude Code prompt buffers.
 function source:enabled()
-  local bufname = vim.api.nvim_buf_get_name(0)
-  local filename = vim.fn.fnamemodify(bufname, ":t")
-  return filename:match("^claude%-prompt%-") ~= nil
+  return require("claude-code-completion").is_claude_buffer()
 end
 
 --- Trigger on `/` character.
@@ -26,21 +32,7 @@ function source:get_completions(ctx, callback)
   local line = ctx.line
   local col = ctx.cursor[2] -- 0-indexed column
 
-  -- Find the `/` that started this completion.
-  -- Only trigger at line start or after whitespace.
-  local slash_col = nil
-  for i = col, 1, -1 do
-    local ch = line:sub(i, i)
-    if ch == "/" then
-      -- Check that the char before `/` is whitespace or start of line
-      if i == 1 or line:sub(i - 1, i - 1):match("%s") then
-        slash_col = i
-      end
-      break
-    elseif ch:match("%s") then
-      break
-    end
-  end
+  local slash_col = require("claude-code-completion").find_slash_col(line, col)
 
   if not slash_col then
     callback({ items = {}, is_incomplete_forward = false, is_incomplete_backward = false })
@@ -48,24 +40,14 @@ function source:get_completions(ctx, callback)
   end
 
   local scanner = require("claude-code-completion.scanner")
-  local skills = scanner.get_skills()
-
-  local kind = 14 -- Keyword
-  local ok, types = pcall(require, "blink.cmp.types")
-  if ok and types.CompletionItemKind then
-    kind = types.CompletionItemKind.Keyword
-  end
-
   --- @type lsp.CompletionItem[]
   local items = {}
 
-  for _, skill in ipairs(skills) do
+  for _, skill in ipairs(scanner.get_skills()) do
     local label = "/" .. skill.name
-
-    --- @type lsp.CompletionItem
-    local item = {
+    items[#items + 1] = {
       label = label,
-      kind = kind,
+      kind = COMPLETION_KIND_KEYWORD,
       filterText = skill.name,
       sortText = skill.name,
       detail = "[" .. skill.source .. "]",
@@ -81,8 +63,6 @@ function source:get_completions(ctx, callback)
         },
       },
     }
-
-    table.insert(items, item)
   end
 
   callback({
