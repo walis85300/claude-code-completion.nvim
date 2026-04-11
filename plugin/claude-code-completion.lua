@@ -1,0 +1,3 @@
+-- Lazy-load entry point: setup is called by the user via lazy.nvim opts.
+-- This file exists so lazy.nvim can discover the plugin.
+-- Users call: require("claude-code-completion").setup(opts)
