@@ -154,7 +154,7 @@ function M.get_skills()
 
   local manifest_skills = read_manifest()
   if manifest_skills and #manifest_skills > 0 then
-    cache = manifest_skills
+    cache = M._dedupe(manifest_skills)
     return cache
   end
 
