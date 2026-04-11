@@ -18,67 +18,33 @@ local defaults = {
 local config = defaults
 local setup_done = false
 
-local CLAUDE_PROMPT_PATTERN = "^claude%-prompt%-"
-
 --- @return claude_code.Config
 function M.get_config()
   return config
 end
 
---- Check if a buffer is a Claude Code prompt file.
---- @param bufnr number|nil Buffer number (0 or nil for current)
+-- Re-export buffer utilities so consumers use a single require path.
+-- Avoids breaking source.lua and external code that calls these.
+
+--- @param bufnr number|nil
 --- @return boolean
 function M.is_claude_buffer(bufnr)
-  local name = vim.api.nvim_buf_get_name(bufnr or 0)
-  return vim.fn.fnamemodify(name, ":t"):match(CLAUDE_PROMPT_PATTERN) ~= nil
+  return require("claude-code-completion.buffer").is_claude_buffer(bufnr)
 end
 
---- Find the slash-command start column in a line, or nil if not valid.
---- Valid positions: line start or after whitespace.
 --- @param line string
---- @param col number 1-indexed cursor column
---- @return number|nil 1-indexed column of the `/`
+--- @param col number
+--- @return number|nil
 function M.find_slash_col(line, col)
-  for i = col, 1, -1 do
-    local ch = line:sub(i, i)
-    if ch == "/" then
-      if i == 1 or line:sub(i - 1, i - 1):match("%s") then
-        return i
-      end
-      return nil
-    elseif ch:match("%s") then
-      return nil
-    end
-  end
-  return nil
+  return require("claude-code-completion.buffer").find_slash_col(line, col)
 end
 
---- Omnifunc for buffers without blink.cmp.
+--- Omnifunc entry point (called by vim via v:lua).
 --- @param findstart number
 --- @param base string
 --- @return number|table
 function M.omnifunc(findstart, base)
-  if findstart == 1 then
-    local line = vim.api.nvim_get_current_line()
-    local col = vim.fn.col(".") - 1
-    local slash_col = M.find_slash_col(line, col)
-    return slash_col and (slash_col - 1) or -3
-  end
-
-  local scanner = require("claude-code-completion.scanner")
-  local items = {}
-  for _, skill in ipairs(scanner.get_skills()) do
-    local label = "/" .. skill.name
-    if base == "" or label:find(base, 1, true) == 1 then
-      items[#items + 1] = {
-        word = label,
-        abbr = label,
-        menu = "[" .. skill.source .. "]",
-        info = skill.description,
-      }
-    end
-  end
-  return items
+  return require("claude-code-completion.omnifunc").complete(findstart, base)
 end
 
 --- Set up the plugin.
@@ -91,35 +57,20 @@ function M.setup(opts)
 
   config = vim.tbl_deep_extend("force", defaults, opts or {})
 
-  local group = vim.api.nvim_create_augroup("ClaudeCodeCompletion", { clear = true })
+  local buffer = require("claude-code-completion.buffer")
+  local highlight = require("claude-code-completion.highlight")
 
+  local group = vim.api.nvim_create_augroup("ClaudeCodeCompletion", { clear = true })
   local last_refresh = 0
   local REFRESH_TTL_SEC = 5
 
-  -- Define highlight groups (user can override with vim.api.nvim_set_hl)
-  local function set_hl_defaults()
-    local set = vim.api.nvim_set_hl
-    -- Slash command: /commit, /review — linked to @keyword by default
-    set(0, "ClaudeSlashCommand", { default = true, link = "@keyword" })
-    -- Namespace separator: the `:` in /ce:work — linked to @punctuation.delimiter
-    set(0, "ClaudeSlashNamespace", { default = true, link = "@punctuation.delimiter" })
-    -- At-mention: @file.ts — linked to @attribute
-    set(0, "ClaudeAtMention", { default = true, link = "@attribute" })
-  end
-
-  set_hl_defaults()
-
-  -- Re-apply defaults after colorscheme change (user overrides survive via `default = true`)
-  vim.api.nvim_create_autocmd("ColorScheme", {
-    group = group,
-    callback = set_hl_defaults,
-  })
+  highlight.register(group)
 
   vim.api.nvim_create_autocmd("BufEnter", {
     group = group,
     pattern = "*",
     callback = function(ev)
-      if not M.is_claude_buffer(ev.buf) then
+      if not buffer.is_claude_buffer(ev.buf) then
         return
       end
 
@@ -133,21 +84,17 @@ function M.setup(opts)
         vim.bo[ev.buf].omnifunc = "v:lua.require'claude-code-completion'.omnifunc"
       end
 
-      -- Apply syntax highlighting for slash commands and @mentions
-      vim.fn.matchadd("ClaudeSlashCommand", [[\v(^|\s)\zs\/[a-zA-Z][a-zA-Z0-9:_-]*]], 10, -1, { window = 0 })
-      vim.fn.matchadd("ClaudeAtMention", [[\v(^|\s)\zs\@[a-zA-Z0-9_./-]+]], 10, -1, { window = 0 })
+      highlight.apply_to_window()
     end,
   })
 
   vim.api.nvim_create_user_command("ClaudeSkillsRefresh", function()
     local scanner = require("claude-code-completion.scanner")
     scanner.refresh()
-    local count = #scanner.get_skills()
-    vim.notify(("Claude Code: refreshed %d skills"):format(count), vim.log.levels.INFO)
+    vim.notify(("Claude Code: refreshed %d skills"):format(#scanner.get_skills()), vim.log.levels.INFO)
   end, { desc = "Refresh Claude Code skills cache" })
 end
 
---- Reset state (for testing).
 --- @private
 function M._reset()
   setup_done = false
