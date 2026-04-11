@@ -96,6 +96,25 @@ function M.setup(opts)
   local last_refresh = 0
   local REFRESH_TTL_SEC = 5
 
+  -- Define highlight groups (user can override with vim.api.nvim_set_hl)
+  local function set_hl_defaults()
+    local set = vim.api.nvim_set_hl
+    -- Slash command: /commit, /review — linked to @keyword by default
+    set(0, "ClaudeSlashCommand", { default = true, link = "@keyword" })
+    -- Namespace separator: the `:` in /ce:work — linked to @punctuation.delimiter
+    set(0, "ClaudeSlashNamespace", { default = true, link = "@punctuation.delimiter" })
+    -- At-mention: @file.ts — linked to @attribute
+    set(0, "ClaudeAtMention", { default = true, link = "@attribute" })
+  end
+
+  set_hl_defaults()
+
+  -- Re-apply defaults after colorscheme change (user overrides survive via `default = true`)
+  vim.api.nvim_create_autocmd("ColorScheme", {
+    group = group,
+    callback = set_hl_defaults,
+  })
+
   vim.api.nvim_create_autocmd("BufEnter", {
     group = group,
     pattern = "*",
@@ -113,6 +132,10 @@ function M.setup(opts)
       if not pcall(require, "blink.cmp") then
         vim.bo[ev.buf].omnifunc = "v:lua.require'claude-code-completion'.omnifunc"
       end
+
+      -- Apply syntax highlighting for slash commands and @mentions
+      vim.fn.matchadd("ClaudeSlashCommand", [[\v(^|\s)\zs\/[a-zA-Z][a-zA-Z0-9:_-]*]], 10, -1, { window = 0 })
+      vim.fn.matchadd("ClaudeAtMention", [[\v(^|\s)\zs\@[a-zA-Z0-9_./-]+]], 10, -1, { window = 0 })
     end,
   })
 
