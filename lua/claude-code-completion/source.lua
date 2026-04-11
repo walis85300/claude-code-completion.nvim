@@ -1,14 +1,16 @@
---- blink.cmp custom source for Claude Code skill completion.
+--- blink.cmp custom source for Claude Code prompt completion.
+--- Handles two trigger contexts:
+---   `/` → skill/command completion
+---   `@` → file reference completion
 --- @module 'blink.cmp'
 --- @class blink.cmp.Source
 local source = {}
 
-local COMPLETION_KIND_KEYWORD = 14
+local CompletionItemKind = { Keyword = 14, File = 17, Folder = 19 }
 
---- Resolve CompletionItemKind.Keyword once at load time.
 local ok, types = pcall(require, "blink.cmp.types")
 if ok and types and types.CompletionItemKind then
-  COMPLETION_KIND_KEYWORD = types.CompletionItemKind.Keyword
+  CompletionItemKind = types.CompletionItemKind
 end
 
 function source.new(opts)
@@ -17,38 +19,27 @@ function source.new(opts)
   return self
 end
 
---- Only enable in Claude Code prompt buffers.
 function source:enabled()
   return require("claude-code-completion.buffer").is_claude_buffer()
 end
 
---- Trigger on `/` and `:` characters.
---- `/` starts a skill name, `:` separates namespace (e.g. /ce:work).
 function source:get_trigger_characters()
-  return { "/", ":" }
+  return { "/", ":", "@" }
 end
 
---- Provide completions from scanned skills.
-function source:get_completions(ctx, callback)
-  local line = ctx.line
-  local col = ctx.cursor[2] -- 0-indexed column
-
-  local slash_col = require("claude-code-completion.buffer").find_slash_col(line, col)
-
-  if not slash_col then
-    callback({ items = {}, is_incomplete_forward = false, is_incomplete_backward = false })
-    return
-  end
-
+--- Build skill completion items for `/` trigger.
+--- @param ctx table blink.cmp context
+--- @param slash_col number 1-indexed column of the `/`
+--- @return lsp.CompletionItem[]
+local function build_skill_items(ctx, slash_col)
   local scanner = require("claude-code-completion.scanner")
-  --- @type lsp.CompletionItem[]
   local items = {}
 
   for _, skill in ipairs(scanner.get_skills()) do
     local label = "/" .. skill.name
     items[#items + 1] = {
       label = label,
-      kind = COMPLETION_KIND_KEYWORD,
+      kind = CompletionItemKind.Keyword,
       filterText = skill.name,
       sortText = skill.name,
       detail = "[" .. skill.source .. "]",
@@ -60,17 +51,93 @@ function source:get_completions(ctx, callback)
         newText = label,
         range = {
           start = { line = ctx.cursor[1] - 1, character = slash_col - 1 },
-          ["end"] = { line = ctx.cursor[1] - 1, character = col },
+          ["end"] = { line = ctx.cursor[1] - 1, character = ctx.cursor[2] },
         },
       },
     }
   end
 
-  callback({
-    items = items,
-    is_incomplete_forward = true,
-    is_incomplete_backward = true,
-  })
+  return items
+end
+
+--- Build @ completion items: agents first, then files.
+--- @param ctx table blink.cmp context
+--- @param at_col number 1-indexed column of the `@`
+--- @return lsp.CompletionItem[]
+local function build_at_items(ctx, at_col)
+  local files_mod = require("claude-code-completion.files")
+  local agents_mod = require("claude-code-completion.agents")
+  local _, prefix = files_mod.find_at_col(ctx.line, ctx.cursor[2])
+  local items = {}
+  local edit_range = {
+    start = { line = ctx.cursor[1] - 1, character = at_col - 1 },
+    ["end"] = { line = ctx.cursor[1] - 1, character = ctx.cursor[2] },
+  }
+
+  -- Agents (@agent-name)
+  for _, agent in ipairs(agents_mod.get_agents()) do
+    local label = "@" .. agent.name
+    items[#items + 1] = {
+      label = label,
+      kind = CompletionItemKind.Reference or 18,
+      filterText = agent.name,
+      sortText = "0" .. agent.name, -- agents before files
+      detail = "[" .. agent.source .. " agent]",
+      documentation = {
+        kind = "markdown",
+        value = agent.description,
+      },
+      textEdit = { newText = label, range = edit_range },
+    }
+  end
+
+  -- Files (@path/to/file)
+  local entries = files_mod.get_files(prefix)
+  for _, entry in ipairs(entries) do
+    local label = "@" .. entry.path
+    local kind = entry.is_dir and CompletionItemKind.Folder or CompletionItemKind.File
+    items[#items + 1] = {
+      label = label,
+      kind = kind,
+      filterText = entry.path,
+      sortText = entry.is_dir and ("1" .. entry.path) or ("2" .. entry.path),
+      detail = entry.is_dir and "directory" or "file",
+      textEdit = { newText = label, range = edit_range },
+    }
+  end
+
+  return items
+end
+
+function source:get_completions(ctx, callback)
+  local line = ctx.line
+  local col = ctx.cursor[2]
+
+  -- Check for @ file reference first
+  local files_mod = require("claude-code-completion.files")
+  local at_col = files_mod.find_at_col(line, col)
+  if at_col then
+    callback({
+      items = build_at_items(ctx, at_col),
+      is_incomplete_forward = true,
+      is_incomplete_backward = true,
+    })
+    return
+  end
+
+  -- Check for / skill/command
+  local buffer = require("claude-code-completion.buffer")
+  local slash_col = buffer.find_slash_col(line, col)
+  if slash_col then
+    callback({
+      items = build_skill_items(ctx, slash_col),
+      is_incomplete_forward = true,
+      is_incomplete_backward = true,
+    })
+    return
+  end
+
+  callback({ items = {}, is_incomplete_forward = false, is_incomplete_backward = false })
 end
 
 return source
