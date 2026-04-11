@@ -97,6 +97,16 @@ vim.defer_fn(function()
     vim.list_extend(skills, scan_dir(sdir, "plugin"))
   end
 
+  -- Dedupe by name (multiple plugin versions have the same skills)
+  local seen = {}
+  local unique = {}
+  for _, s in ipairs(skills) do
+    if not seen[s.name] then
+      seen[s.name] = true
+      unique[#unique + 1] = s
+    end
+  end
+
   -- Write manifest
   local tmpdir = get_tmpdir()
   local manifest_path = tmpdir .. "/claude-skills-" .. sha256_short(cwd) .. ".json"
@@ -106,7 +116,7 @@ vim.defer_fn(function()
     version = 1,
     cwd = cwd,
     generated_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-    skills = skills,
+    skills = unique,
   }
 
   local content = vim.json.encode(manifest)
