@@ -77,6 +77,7 @@ function M.setup(opts)
       local now = vim.uv.now() / 1000
       if (now - last_refresh) > REFRESH_TTL_SEC then
         require("claude-code-completion.scanner").refresh()
+        require("claude-code-completion.agents").refresh()
         last_refresh = now
       end
 
@@ -90,9 +91,13 @@ function M.setup(opts)
 
   vim.api.nvim_create_user_command("ClaudeSkillsRefresh", function()
     local scanner = require("claude-code-completion.scanner")
+    local agents = require("claude-code-completion.agents")
     scanner.refresh()
-    vim.notify(("Claude Code: refreshed %d skills"):format(#scanner.get_skills()), vim.log.levels.INFO)
-  end, { desc = "Refresh Claude Code skills cache" })
+    agents.refresh()
+    local skill_count = #scanner.get_skills()
+    local agent_count = #agents.get_agents()
+    vim.notify(("Claude Code: refreshed %d skills, %d agents"):format(skill_count, agent_count), vim.log.levels.INFO)
+  end, { desc = "Refresh Claude Code skills and agents cache" })
 end
 
 --- @private

@@ -60,16 +60,39 @@ local function build_skill_items(ctx, slash_col)
   return items
 end
 
---- Build file completion items for `@` trigger.
+--- Build @ completion items: agents first, then files.
 --- @param ctx table blink.cmp context
 --- @param at_col number 1-indexed column of the `@`
 --- @return lsp.CompletionItem[]
-local function build_file_items(ctx, at_col)
+local function build_at_items(ctx, at_col)
   local files_mod = require("claude-code-completion.files")
+  local agents_mod = require("claude-code-completion.agents")
   local _, prefix = files_mod.find_at_col(ctx.line, ctx.cursor[2])
-  local entries = files_mod.get_files(prefix)
   local items = {}
+  local edit_range = {
+    start = { line = ctx.cursor[1] - 1, character = at_col - 1 },
+    ["end"] = { line = ctx.cursor[1] - 1, character = ctx.cursor[2] },
+  }
 
+  -- Agents (@agent-name)
+  for _, agent in ipairs(agents_mod.get_agents()) do
+    local label = "@" .. agent.name
+    items[#items + 1] = {
+      label = label,
+      kind = CompletionItemKind.Reference or 18,
+      filterText = agent.name,
+      sortText = "0" .. agent.name, -- agents before files
+      detail = "[" .. agent.source .. " agent]",
+      documentation = {
+        kind = "markdown",
+        value = agent.description,
+      },
+      textEdit = { newText = label, range = edit_range },
+    }
+  end
+
+  -- Files (@path/to/file)
+  local entries = files_mod.get_files(prefix)
   for _, entry in ipairs(entries) do
     local label = "@" .. entry.path
     local kind = entry.is_dir and CompletionItemKind.Folder or CompletionItemKind.File
@@ -77,15 +100,9 @@ local function build_file_items(ctx, at_col)
       label = label,
       kind = kind,
       filterText = entry.path,
-      sortText = entry.is_dir and ("0" .. entry.path) or ("1" .. entry.path),
+      sortText = entry.is_dir and ("1" .. entry.path) or ("2" .. entry.path),
       detail = entry.is_dir and "directory" or "file",
-      textEdit = {
-        newText = label,
-        range = {
-          start = { line = ctx.cursor[1] - 1, character = at_col - 1 },
-          ["end"] = { line = ctx.cursor[1] - 1, character = ctx.cursor[2] },
-        },
-      },
+      textEdit = { newText = label, range = edit_range },
     }
   end
 
@@ -101,7 +118,7 @@ function source:get_completions(ctx, callback)
   local at_col = files_mod.find_at_col(line, col)
   if at_col then
     callback({
-      items = build_file_items(ctx, at_col),
+      items = build_at_items(ctx, at_col),
       is_incomplete_forward = true,
       is_incomplete_backward = true,
     })
