@@ -24,9 +24,14 @@ It detects Claude Code's temp prompt buffers, discovers every available skill (b
 {
   "walis85300/claude-code-completion.nvim",
   event = "BufEnter",
+  dependencies = {
+    "MeanderingProgrammer/render-markdown.nvim",
+  },
   opts = {},
 }
 ```
+
+The plugin ships with [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim) as a dependency — Claude Code prompts are always `.md` files, so you get rendered headings, bullets, tables, and checkboxes out of the box.
 
 ### With blink.cmp provider (recommended)
 
