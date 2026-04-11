@@ -62,19 +62,42 @@ local function read_manifest()
 end
 
 --- Scan a directory for skill .md files.
+--- Handles two layouts:
+---   1. Flat: dir/*.md (user/project skills)
+---   2. Nested: dir/<name>/SKILL.md (plugin skills)
 --- @param dir string
 --- @param source string
 --- @return claude_code.Skill[]
 local function scan_dir(dir, source)
   local skills = {}
-  local files = vim.fn.glob(dir .. "/*.md", false, true)
-  for _, filepath in ipairs(files) do
+  if vim.fn.isdirectory(dir) ~= 1 then
+    return skills
+  end
+
+  -- Flat: dir/*.md
+  local md_files = vim.fn.glob(dir .. "/*.md", false, true)
+  for _, filepath in ipairs(md_files) do
     local skill = frontmatter.parse_skill_file(filepath)
     if skill then
       skill.source = source
       table.insert(skills, skill)
     end
   end
+
+  -- Nested: dir/<name>/SKILL.md
+  local subdirs = vim.fn.glob(dir .. "/*/SKILL.md", false, true)
+  for _, skill_file in ipairs(subdirs) do
+    local skill = frontmatter.parse_skill_file(skill_file)
+    if skill then
+      -- Use parent directory name as fallback name
+      if not skill.name or skill.name == "SKILL" then
+        skill.name = vim.fn.fnamemodify(skill_file, ":h:t")
+      end
+      skill.source = source
+      table.insert(skills, skill)
+    end
+  end
+
   return skills
 end
 

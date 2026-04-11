@@ -97,27 +97,43 @@ function parseFrontmatter(content: string): Record<string, string> {
 }
 
 // --- Scan a directory for skill .md files ---
+// Handles two layouts:
+//   1. Flat: skills/*.md  (user/project skills)
+//   2. Nested: skills/<name>/SKILL.md  (plugin skills)
 function scanSkillDir(dir: string, source: Skill["source"], pluginName?: string): Skill[] {
   const skills: Skill[] = [];
   if (!existsSync(dir)) return skills;
 
   try {
-    const files = readdirSync(dir).filter((f) => f.endsWith(".md"));
-    for (const file of files) {
-      const filePath = join(dir, file);
+    const entries = readdirSync(dir);
+    for (const entry of entries) {
+      const entryPath = join(dir, entry);
       try {
-        if (!statSync(filePath).isFile()) continue;
-        const content = readFileSync(filePath, "utf-8");
-        const fm = parseFrontmatter(content);
+        const st = statSync(entryPath);
 
-        if (fm["user-invocable"] === "false") continue;
+        if (st.isFile() && entry.endsWith(".md")) {
+          // Flat layout: skills/foo.md
+          const content = readFileSync(entryPath, "utf-8");
+          const fm = parseFrontmatter(content);
+          if (fm["user-invocable"] === "false") continue;
+          const name = fm.name || basename(entry, ".md");
+          const description = fm.description || "";
+          skills.push({ name, description, source, ...(pluginName ? { plugin: pluginName } : {}) });
 
-        const name = fm.name || basename(file, ".md");
-        const description = fm.description || "";
-
-        skills.push({ name, description, source, ...(pluginName ? { plugin: pluginName } : {}) });
+        } else if (st.isDirectory()) {
+          // Nested layout: skills/<name>/SKILL.md
+          const skillFile = join(entryPath, "SKILL.md");
+          if (existsSync(skillFile) && statSync(skillFile).isFile()) {
+            const content = readFileSync(skillFile, "utf-8");
+            const fm = parseFrontmatter(content);
+            if (fm["user-invocable"] === "false") continue;
+            const name = fm.name || entry; // directory name as fallback
+            const description = fm.description || "";
+            skills.push({ name, description, source, ...(pluginName ? { plugin: pluginName } : {}) });
+          }
+        }
       } catch {
-        // skip unreadable files
+        // skip unreadable entries
       }
     }
   } catch {
