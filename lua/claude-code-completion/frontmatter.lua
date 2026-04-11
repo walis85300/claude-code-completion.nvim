@@ -6,14 +6,11 @@ local M = {}
 --- @return table<string, string>
 function M.parse(content)
   local result = {}
-  local start_pat = "^%-%-%-\r?\n"
-  local s = content:match(start_pat)
-  if not s then
+  if not content:match("^%-%-%-\r?\n") then
     return result
   end
 
-  -- Find the closing ---
-  local after_open = content:find("\n", 4) -- skip first ---
+  local after_open = content:find("\n", 4)
   if not after_open then
     return result
   end
@@ -28,7 +25,6 @@ function M.parse(content)
   for line in fm_block:gmatch("[^\r\n]+") do
     local key, value = line:match("^(%S+)%s*:%s*(.+)")
     if key and value then
-      -- Strip surrounding quotes
       value = value:gsub("^[\"']", ""):gsub("[\"']$", ""):gsub("%s+$", "")
       result[key] = value
     end
@@ -37,41 +33,55 @@ function M.parse(content)
   return result
 end
 
---- Parse a skill .md file and return skill info, or nil if skipped.
+--- Parse a skill .md file and return name + description, or nil if skipped.
+--- Only reads the frontmatter header, not the full file body.
 --- @param filepath string Absolute path to the .md file
---- @return claude_code.Skill|nil
+--- @return { name: string, description: string }|nil
 function M.parse_skill_file(filepath)
   local f = io.open(filepath, "r")
   if not f then
     return nil
   end
 
-  local content = f:read("*a")
+  -- Read only the frontmatter header (stop at closing ---)
+  local lines = {}
+  local found_open = false
+  for line in f:lines() do
+    if not found_open then
+      if line:match("^%-%-%-") then
+        found_open = true
+        lines[#lines + 1] = line
+      else
+        break -- no frontmatter
+      end
+    else
+      lines[#lines + 1] = line
+      if line:match("^%-%-%-") then
+        break -- closing delimiter
+      end
+    end
+  end
   f:close()
 
-  if not content or content == "" then
+  if #lines < 2 then
     return nil
   end
 
+  local content = table.concat(lines, "\n")
   local fm = M.parse(content)
 
-  -- Skip non-user-invocable skills
   if fm["user-invocable"] == "false" then
     return nil
   end
 
-  -- Name: from frontmatter or filename stem
   local name = fm.name
   if not name or name == "" then
     name = vim.fn.fnamemodify(filepath, ":t:r")
   end
 
-  local description = fm.description or ""
-
   return {
     name = name,
-    description = description,
-    source = "user", -- caller overrides this
+    description = fm.description or "",
   }
 end
 
