@@ -94,13 +94,20 @@ function M.setup(opts)
         end,
       })
 
-      -- Buffer-local keymaps for the picker
+      -- Smart paste: auto-fence code, link URLs, blockquote long text
+      require("claude-code-completion.smart-paste").attach(ev.buf)
+
+      -- Buffer-local keymaps
       local picker = require("claude-code-completion.picker")
+      local nav = require("claude-code-completion.navigator")
       vim.keymap.set("n", "<leader>/", picker.skills, { buffer = ev.buf, desc = "Claude: browse skills" })
       vim.keymap.set("n", "<leader>@", picker.mentions, { buffer = ev.buf, desc = "Claude: browse files/agents" })
       vim.keymap.set("n", "<leader>cp", function() picker.open() end, { buffer = ev.buf, desc = "Claude: browse all" })
       vim.keymap.set("i", "<C-/>", picker.skills, { buffer = ev.buf, desc = "Claude: browse skills" })
       vim.keymap.set("i", "<C-@>", picker.mentions, { buffer = ev.buf, desc = "Claude: browse files/agents" })
+      vim.keymap.set("n", "<leader>s", nav.open, { buffer = ev.buf, desc = "Claude: section navigator" })
+      vim.keymap.set("n", "]]", nav.next, { buffer = ev.buf, desc = "Claude: next section" })
+      vim.keymap.set("n", "[[", nav.prev, { buffer = ev.buf, desc = "Claude: prev section" })
     end,
   })
 
