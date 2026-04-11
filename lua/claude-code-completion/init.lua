@@ -23,8 +23,7 @@ function M.get_config()
   return config
 end
 
--- Re-export buffer utilities so consumers use a single require path.
--- Avoids breaking source.lua and external code that calls these.
+-- Re-export buffer utilities for consumers.
 
 --- @param bufnr number|nil
 --- @return boolean
@@ -85,19 +84,39 @@ function M.setup(opts)
         vim.bo[ev.buf].omnifunc = "v:lua.require'claude-code-completion'.omnifunc"
       end
 
-      highlight.apply_to_window()
+      highlight.apply(ev.buf)
+
+      -- Live semantic highlighting as you type
+      vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+        buffer = ev.buf,
+        callback = function()
+          highlight.apply(ev.buf)
+        end,
+      })
+
+      -- Buffer-local keymaps for the picker
+      local picker = require("claude-code-completion.picker")
+      vim.keymap.set("n", "<leader>/", picker.skills, { buffer = ev.buf, desc = "Claude: browse skills" })
+      vim.keymap.set("n", "<leader>@", picker.mentions, { buffer = ev.buf, desc = "Claude: browse files/agents" })
+      vim.keymap.set("n", "<leader>cp", function() picker.open() end, { buffer = ev.buf, desc = "Claude: browse all" })
+      vim.keymap.set("i", "<C-/>", picker.skills, { buffer = ev.buf, desc = "Claude: browse skills" })
+      vim.keymap.set("i", "<C-@>", picker.mentions, { buffer = ev.buf, desc = "Claude: browse files/agents" })
     end,
   })
 
+  -- Global commands
   vim.api.nvim_create_user_command("ClaudeSkillsRefresh", function()
     local scanner = require("claude-code-completion.scanner")
     local agents = require("claude-code-completion.agents")
     scanner.refresh()
     agents.refresh()
-    local skill_count = #scanner.get_skills()
-    local agent_count = #agents.get_agents()
-    vim.notify(("Claude Code: refreshed %d skills, %d agents"):format(skill_count, agent_count), vim.log.levels.INFO)
+    vim.notify(("Claude Code: refreshed %d skills, %d agents"):format(
+      #scanner.get_skills(), #agents.get_agents()), vim.log.levels.INFO)
   end, { desc = "Refresh Claude Code skills and agents cache" })
+
+  vim.api.nvim_create_user_command("ClaudePicker", function(cmd)
+    require("claude-code-completion.picker").open(cmd.args ~= "" and cmd.args or nil)
+  end, { nargs = "?", desc = "Open Claude Code picker (skills, agents, files)" })
 end
 
 --- @private

@@ -26,12 +26,15 @@ It detects Claude Code's temp prompt buffers, discovers every available skill (b
   event = "BufEnter",
   dependencies = {
     "MeanderingProgrammer/render-markdown.nvim",
+    "ibhagwan/fzf-lua",
   },
   opts = {},
 }
 ```
 
-The plugin ships with [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim) as a dependency — Claude Code prompts are always `.md` files, so you get rendered headings, bullets, tables, and checkboxes out of the box.
+Bundled dependencies:
+- [render-markdown.nvim](https://github.com/MeanderingProgrammer/render-markdown.nvim) — Claude prompts are `.md` files; rendered headings, bullets, tables out of the box
+- [fzf-lua](https://github.com/ibhagwan/fzf-lua) — powers the picker for browsing skills, agents, and files with preview
 
 ### With blink.cmp provider (recommended)
 
@@ -98,8 +101,43 @@ require("claude-code-completion").setup({
 
 | Command | Description |
 |---------|-------------|
-| `:ClaudeSkillsRefresh` | Clear cache and rescan skills |
+| `:ClaudeSkillsRefresh` | Clear cache and rescan skills + agents |
+| `:ClaudePicker` | Open fzf picker (all skills, agents, files) |
+| `:ClaudePicker /` | Open picker filtered to skills |
+| `:ClaudePicker @` | Open picker filtered to agents + files |
 | `:checkhealth claude-code-completion` | Verify setup |
+
+## Keybindings (Claude prompt buffers only)
+
+| Mode | Key | Action |
+|------|-----|--------|
+| Normal | `<leader>/` | Browse skills with fzf preview |
+| Normal | `<leader>@` | Browse agents + files with fzf preview |
+| Normal | `<leader>cp` | Browse all (skills, agents, files) |
+| Insert | `Ctrl+/` | Browse skills (insert mode) |
+| Insert | `Ctrl+@` | Browse agents + files (insert mode) |
+
+Selecting an item inserts it at the cursor position (`/skill-name` or `@file-path`).
+
+## Semantic Highlighting
+
+Known skills and agents are highlighted differently from unrecognized ones:
+
+| Pattern | Highlight | Meaning |
+|---------|-----------|---------|
+| `/commit` | `ClaudeSlashCommand` (keyword color) | Known skill |
+| `/typo` | `ClaudeSlashUnknown` (comment/dim) | Not a known skill |
+| `@Explore` | `ClaudeAtAgent` (attribute color) | Known agent |
+| `@src/file.ts` | `ClaudeAtFile` (string color) | File exists in project |
+| `@nonexistent` | `ClaudeAtUnknown` (comment/dim) | Not found |
+
+Highlights update live as you type. Customize with:
+
+```lua
+vim.api.nvim_set_hl(0, "ClaudeSlashCommand", { fg = "#ff9e64", bold = true })
+vim.api.nvim_set_hl(0, "ClaudeAtAgent", { fg = "#7dcfff", bold = true })
+vim.api.nvim_set_hl(0, "ClaudeAtFile", { fg = "#9ece6a" })
+```
 
 ## How It Works
 
