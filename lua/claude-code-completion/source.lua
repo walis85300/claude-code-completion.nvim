@@ -22,9 +22,10 @@ function source:enabled()
   return require("claude-code-completion").is_claude_buffer()
 end
 
---- Trigger on `/` character.
+--- Trigger on `/` and `:` characters.
+--- `/` starts a skill name, `:` separates namespace (e.g. /ce:work).
 function source:get_trigger_characters()
-  return { "/" }
+  return { "/", ":" }
 end
 
 --- Provide completions from scanned skills.
@@ -67,8 +68,8 @@ function source:get_completions(ctx, callback)
 
   callback({
     items = items,
-    is_incomplete_forward = false,
-    is_incomplete_backward = false,
+    is_incomplete_forward = true,
+    is_incomplete_backward = true,
   })
 end
 
