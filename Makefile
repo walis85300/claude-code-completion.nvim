@@ -1,8 +1,8 @@
 NVIM := nvim --headless -u tests/minimal_init.lua
 
-.PHONY: test test-frontmatter test-builtins test-init test-dedupe test-files test-agents
+.PHONY: test test-frontmatter test-builtins test-init test-dedupe test-files test-agents test-highlight test-picker
 
-test: test-frontmatter test-builtins test-init test-dedupe test-files test-agents
+test: test-frontmatter test-builtins test-init test-dedupe test-files test-agents test-highlight test-picker
 	@echo "\nAll tests passed."
 
 test-frontmatter:
@@ -22,3 +22,9 @@ test-files:
 
 test-agents:
 	@$(NVIM) -l tests/test_agents.lua
+
+test-highlight:
+	@$(NVIM) -l tests/test_highlight.lua
+
+test-picker:
+	@$(NVIM) -l tests/test_picker.lua
