@@ -106,6 +106,21 @@ local function scan_plugins(claude_dir)
   return skills
 end
 
+--- Remove duplicate skill names, keeping the first occurrence.
+--- @param skills claude_code.Skill[]
+--- @return claude_code.Skill[]
+local function dedupe(skills)
+  local seen = {}
+  local result = {}
+  for _, s in ipairs(skills) do
+    if not seen[s.name] then
+      seen[s.name] = true
+      result[#result + 1] = s
+    end
+  end
+  return result
+end
+
 --- Full filesystem scan (fallback when no manifest).
 --- @return claude_code.Skill[]
 local function filesystem_scan()
@@ -126,7 +141,7 @@ local function filesystem_scan()
     vim.list_extend(skills, scan_plugins(claude_dir))
   end
 
-  return skills
+  return dedupe(skills)
 end
 
 --- Get skills (cached). Tries manifest first, then filesystem scan.
