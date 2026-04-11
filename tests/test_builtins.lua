@@ -21,7 +21,7 @@ print("\n=== builtins ===")
 local skills = builtins.get()
 
 check("returns a table", type(skills) == "table")
-check("has 50+ entries", #skills > 50, "got: " .. #skills)
+check("has entries", #skills > 0, "got: " .. #skills)
 
 -- Verify structure
 local first = skills[1]
@@ -29,7 +29,7 @@ check("entry has name", type(first.name) == "string" and first.name ~= "")
 check("entry has description", type(first.description) == "string" and first.description ~= "")
 check("entry has source", first.source == "builtin" or first.source == "bundled")
 
--- Check known commands exist
+-- Check prompt-meaningful skills exist
 local names = {}
 for _, s in ipairs(skills) do
   names[s.name] = true
@@ -39,8 +39,24 @@ check("/review exists", names["review"] == true)
 check("/compact exists", names["compact"] == true)
 check("/simplify exists (bundled)", names["simplify"] == true)
 check("/remember exists (bundled)", names["remember"] == true)
+check("/debug exists (bundled)", names["debug"] == true)
+check("/commit-push-pr exists", names["commit-push-pr"] == true)
 
--- Check internal commands are NOT present
+-- CLI-only commands must NOT be present (they don't belong in the editor)
+check("no /exit (CLI-only)", names["exit"] == nil)
+check("no /clear (CLI-only)", names["clear"] == nil)
+check("no /login (CLI-only)", names["login"] == nil)
+check("no /logout (CLI-only)", names["logout"] == nil)
+check("no /theme (CLI-only)", names["theme"] == nil)
+check("no /vim (CLI-only)", names["vim"] == nil)
+check("no /color (CLI-only)", names["color"] == nil)
+check("no /help (CLI-only)", names["help"] == nil)
+check("no /mcp (CLI-only)", names["mcp"] == nil)
+check("no /plugin (CLI-only)", names["plugin"] == nil)
+check("no /cost (CLI-only)", names["cost"] == nil)
+check("no /status (CLI-only)", names["status"] == nil)
+
+-- Internal commands still absent
 check("no backfill-sessions", names["backfill-sessions"] == nil)
 check("no break-cache", names["break-cache"] == nil)
 check("no bughunter", names["bughunter"] == nil)
