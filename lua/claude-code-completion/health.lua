@@ -36,12 +36,6 @@ function M.check()
     vim.health.info("No SessionStart hook manifest — using filesystem scan fallback")
   end
 
-  if vim.fn.executable("bun") == 1 then
-    vim.health.ok("bun is available (for claude-skills-manifest hook)")
-  else
-    vim.health.info("bun not found — hook script requires bun to run")
-  end
-
   local skills = scanner.get_skills()
   vim.health.ok(("Total skills discovered: %d"):format(#skills))
 end

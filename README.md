@@ -1,35 +1,34 @@
 # claude-code-completion.nvim
 
-Autocomplete for Claude Code skills and slash commands when editing prompts via `Ctrl+G`.
+Skill and slash-command autocomplete for Neovim inside Claude Code's `Ctrl+G` editor.
 
-When you press `Ctrl+G` in Claude Code, it opens your `$EDITOR` with a temp file. This plugin detects those buffers and provides completion for `/slash-commands` via [blink.cmp](https://github.com/saghen/blink.cmp) (LazyVim's default completion engine).
+Claude Code has 50+ built-in commands, bundled skills, and hundreds of plugin-provided skills. When `Ctrl+G` opens your editor, you're on your own remembering them. This plugin brings them all into your completion menu.
+
+It detects Claude Code's temp prompt buffers, discovers every available skill (built-in, user, project, and plugin), and feeds them to [blink.cmp](https://github.com/saghen/blink.cmp) — the default completion engine in LazyVim. Type `/` and see everything.
 
 ## Features
 
-- Autocomplete for 50+ built-in commands and bundled skills
-- Dynamic discovery of user skills (`~/.claude/skills/`)
-- Dynamic discovery of project skills (`.claude/skills/`)
-- Dynamic discovery of plugin skills (`~/.claude/plugins/`)
-- **SessionStart hook** for project-aware skill manifests (recommended)
-- Falls back to filesystem scan when no hook manifest exists
-- Omnifunc fallback for non-blink.cmp setups
-- Zero dependencies beyond Neovim 0.10+
+- `/` completion for 50+ built-in commands and bundled skills
+- Dynamic discovery from `~/.claude/skills/`, `.claude/skills/`, and `~/.claude/plugins/`
+- **SessionStart hook** writes a project-aware manifest — skills reflect the CWD Claude Code is running in
+- Filesystem scan fallback when no manifest exists
+- Omnifunc fallback for setups without blink.cmp
+- Zero external dependencies — only requires Neovim 0.10+
+- Works on macOS and Linux
 
 ## Installation
 
-### lazy.nvim (recommended)
+### lazy.nvim
 
 ```lua
 {
-  "eduardoalva/claude-code-completion.nvim",
+  "walis85300/claude-code-completion.nvim",
   event = "BufEnter",
   opts = {},
 }
 ```
 
-### With blink.cmp provider registration
-
-For best results, also register the source in your blink.cmp config:
+### With blink.cmp provider (recommended)
 
 ```lua
 {
@@ -51,19 +50,17 @@ For best results, also register the source in your blink.cmp config:
 
 ## SessionStart Hook (recommended)
 
-For the most complete skill discovery, install the included hook script. It runs on every Claude Code session start and writes a JSON manifest that the plugin reads:
+The hook runs a Lua script via `nvim --headless` on every Claude Code session start. It reuses the plugin's own scanner and frontmatter parser — no external dependencies beyond nvim itself.
 
-1. Make the script available in your `$PATH`:
+### Setup
+
+1. Add the script to your `$PATH`:
 
 ```bash
-# Option A: symlink
-ln -s "$(find ~/.local/share/nvim/lazy/claude-code-completion.nvim/bin -name claude-skills-manifest)" ~/.local/bin/claude-skills-manifest
-
-# Option B: copy
-cp ~/.local/share/nvim/lazy/claude-code-completion.nvim/bin/claude-skills-manifest ~/.local/bin/
+ln -s ~/.local/share/nvim/lazy/claude-code-completion.nvim/bin/claude-skills-manifest ~/.local/bin/
 ```
 
-2. Add the hook to your Claude Code `settings.json`:
+2. Add the hook to `~/.claude/settings.json`:
 
 ```json
 {
@@ -78,9 +75,7 @@ cp ~/.local/share/nvim/lazy/claude-code-completion.nvim/bin/claude-skills-manife
 }
 ```
 
-The hook requires [Bun](https://bun.sh). It scans all skill sources in Claude Code's CWD context and writes a manifest to `/tmp/claude-skills-*.json`.
-
-Without the hook, the plugin falls back to scanning skill directories from nvim using the inherited CWD.
+The hook scans all skill sources from Claude Code's CWD context and writes a manifest to `$TMPDIR/claude-skills-*.json`. Without it, the plugin falls back to scanning skill directories from nvim using the inherited CWD.
 
 ## Configuration
 
@@ -96,36 +91,41 @@ require("claude-code-completion").setup({
 
 ## Commands
 
-- `:ClaudeSkillsRefresh` - Clear cache and rescan skills
-- `:checkhealth claude-code-completion` - Verify setup
+| Command | Description |
+|---------|-------------|
+| `:ClaudeSkillsRefresh` | Clear cache and rescan skills |
+| `:checkhealth claude-code-completion` | Verify setup |
 
 ## How It Works
 
 ```
 Claude Code (Ctrl+G)
-    |
-    v
+    │
+    ▼
 Opens $EDITOR with /tmp/claude-prompt-{uuid}.md
-    |
-    v
-Plugin detects buffer name pattern
-    |
-    v
-Reads SessionStart hook manifest (or scans filesystem)
-    |
-    v
+    │
+    ▼
+Plugin detects buffer name ──► Reads hook manifest or scans filesystem
+    │
+    ▼
 blink.cmp shows completions when you type "/"
 ```
 
-## Skill Sources (priority order)
+## Skill Sources
 
-| Source | Location | Method |
-|--------|----------|--------|
-| Hook manifest | `/tmp/claude-skills-*.json` | Written by SessionStart hook |
-| Built-in commands | Hardcoded in plugin | Always available |
-| User skills | `~/.claude/skills/*.md` | Frontmatter parsed |
-| Project skills | `.claude/skills/*.md` | Frontmatter parsed |
-| Plugin skills | `~/.claude/plugins/*/skills/*.md` | Frontmatter parsed |
+| Priority | Source | Location |
+|----------|--------|----------|
+| 1 | Hook manifest | `$TMPDIR/claude-skills-{hash}.json` |
+| 2 | Built-in commands | Hardcoded in plugin |
+| 3 | User skills | `~/.claude/skills/*.md` |
+| 4 | Project skills | `{cwd}/.claude/skills/*.md` |
+| 5 | Plugin skills | `~/.claude/plugins/**/skills/` |
+
+## Running Tests
+
+```bash
+make test
+```
 
 ## License
 
