@@ -3,14 +3,16 @@ local M = {}
 function M.check()
   vim.health.start("claude-code-completion")
 
+  local discovery = require("claude-code-completion.discovery")
   local has_blink = pcall(require, "blink.cmp")
+
   if has_blink then
     vim.health.ok("blink.cmp is available")
   else
     vim.health.warn("blink.cmp not found — using omnifunc fallback")
   end
 
-  local claude_dir = (vim.uv.os_homedir() or vim.fn.expand("~")) .. "/.claude"
+  local claude_dir = discovery.get_claude_dir()
   local stat = vim.uv.fs_stat(claude_dir)
   if stat and stat.type == "directory" then
     vim.health.ok("~/.claude/ directory exists")
@@ -28,16 +30,17 @@ function M.check()
   end
 
   local scanner = require("claude-code-completion.scanner")
-  local manifest_path = scanner.get_manifest_path()
-  local manifest_stat = vim.uv.fs_stat(manifest_path)
+  local manifest_stat = vim.uv.fs_stat(scanner.get_manifest_path())
   if manifest_stat then
-    vim.health.ok("SessionStart hook manifest found: " .. manifest_path)
+    vim.health.ok("SessionStart hook manifest found: " .. scanner.get_manifest_path())
   else
     vim.health.info("No SessionStart hook manifest — using filesystem scan fallback")
   end
 
-  local skills = scanner.get_skills()
-  vim.health.ok(("Total skills discovered: %d"):format(#skills))
+  local agents = require("claude-code-completion.agents")
+  local skill_count = #scanner.get_skills()
+  local agent_count = #agents.get_agents()
+  vim.health.ok(("Skills: %d | Agents: %d"):format(skill_count, agent_count))
 end
 
 return M

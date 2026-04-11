@@ -1,5 +1,5 @@
 --- Tests for skill deduplication (reproduces duplicate plugin versions issue).
-local scanner = require("claude-code-completion.scanner")
+local discovery = require("claude-code-completion.discovery")
 
 local pass, fail = 0, 0
 
@@ -35,7 +35,7 @@ do
     { name = "review", description = "Code review", source = "builtin" },
   }
 
-  local result = scanner._dedupe(skills)
+  local result = discovery.dedupe(skills)
 
   check("removes duplicates", #result == 4, "got: " .. #result .. " expected: 4")
 
@@ -54,7 +54,7 @@ do
     { name = "review", description = "Plugin review", source = "plugin" },
   }
 
-  local result = scanner._dedupe(skills)
+  local result = discovery.dedupe(skills)
 
   check("first occurrence wins", #result == 1)
   check("builtin beats plugin", result[1].source == "builtin", "got: " .. result[1].source)
@@ -69,19 +69,19 @@ do
     { name = "my-skill", description = "Custom", source = "user" },
   }
 
-  local result = scanner._dedupe(skills)
+  local result = discovery.dedupe(skills)
   check("no-op when no duplicates", #result == 3)
 end
 
 -- Empty input
 do
-  local result = scanner._dedupe({})
+  local result = discovery.dedupe({})
   check("empty input returns empty", #result == 0)
 end
 
 -- Single item
 do
-  local result = scanner._dedupe({ { name = "solo", description = "Only one", source = "user" } })
+  local result = discovery.dedupe({ { name = "solo", description = "Only one", source = "user" } })
   check("single item passes through", #result == 1)
   check("single item preserved", result[1].name == "solo")
 end
@@ -93,7 +93,7 @@ do
     skills[#skills + 1] = { name = "ce:work", description = "version " .. i, source = "plugin" }
   end
 
-  local result = scanner._dedupe(skills)
+  local result = discovery.dedupe(skills)
   check("10 identical names -> 1 result", #result == 1, "got: " .. #result)
   check("keeps first version", result[1].description == "version 1")
 end
