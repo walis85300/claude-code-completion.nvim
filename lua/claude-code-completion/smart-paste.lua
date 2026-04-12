@@ -4,47 +4,11 @@
 --- Long text (>3 lines) → blockquote
 local M = {}
 
--- Fallback patterns for short snippets that vim.filetype.match misses.
--- Only the most common languages — vim.filetype handles the long tail.
-local FALLBACK = {
-  { "^import%s+.+from%s+['\"]", "typescript" },
-  { "^export%s+", "typescript" },
-  { "^const%s+%w+%s*[=:]", "typescript" },
-  { "^interface%s+%w+", "typescript" },
-  { "^type%s+%w+%s*=", "typescript" },
-  { "^def%s+%w+", "python" },
-  { "^from%s+%w+%s+import", "python" },
-  { "^package%s+%w+", "go" },
-  { "^func%s+", "go" },
-  { "^fn%s+%w+", "rust" },
-  { "^pub%s+fn", "rust" },
-  { "^local%s+%w+%s*=", "lua" },
-  { "^SELECT%s+", "sql" },
-  { "^CREATE%s+TABLE", "sql" },
-  { "^FROM%s+%w+", "dockerfile" },
-  { "^RUN%s+", "dockerfile" },
-  { "^{%s*$", "json" },
-}
-
 --- @param text string
 --- @return string|nil
 local function detect_language(text)
-  local lines = vim.split(text, "\n")
-
-  -- Try nvim's built-in filetype detection first (treesitter + heuristics)
-  local ft = vim.filetype.match({ contents = lines })
-  if ft and ft ~= "" then return ft end
-
-  -- Fallback: match first non-empty line against common patterns
-  local first = ""
-  for _, line in ipairs(lines) do
-    if line:match("%S") then first = line; break end
-  end
-  for _, entry in ipairs(FALLBACK) do
-    if first:match(entry[1]) then return entry[2] end
-  end
-
-  return nil
+  local ft = vim.filetype.match({ contents = vim.split(text, "\n") })
+  return (ft and ft ~= "") and ft or nil
 end
 
 --- @param text string

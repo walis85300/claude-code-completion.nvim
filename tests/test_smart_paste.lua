@@ -13,12 +13,10 @@ local function check(name, ok, msg)
   end
 end
 
---- Check that format() wraps text in a code fence (any language).
 local function is_fenced(result)
   return #result >= 3 and result[1]:match("^```") and result[#result] == "```"
 end
 
---- Check that format() wraps text as a blockquote.
 local function is_blockquoted(result)
   for _, line in ipairs(result) do
     if not line:match("^> ") then return false end
@@ -26,98 +24,78 @@ local function is_blockquoted(result)
   return #result > 0
 end
 
---- Check that format() wraps text as a markdown link.
 local function is_link(result)
   return #result == 1 and result[1]:match("^%[.*%]%(.*%)$") ~= nil
 end
 
-print("\n=== smart-paste: code detection ===")
+print("\n=== smart-paste: code detection (vim.filetype.match) ===")
 
-local code_samples = {
-  { "import React from 'react'\nconst App = () => {}\nexport default App", "typescript import" },
-  { "def hello():\n    print('world')\n    return True", "python def" },
-  { "package main\n\nfunc main() {\n    fmt.Println(\"hello\")\n}", "go package" },
-  { "local M = {}\nfunction M.setup()\nend\nreturn M", "lua local" },
-  { "#!/usr/bin/env bash\necho hello\nexit 0", "bash shebang" },
-  { "SELECT * FROM users\nWHERE id = 1;", "sql select" },
-  { "FROM node:20\nRUN npm install\nCOPY . .", "dockerfile" },
-}
-
-for _, sample in ipairs(code_samples) do
-  local result = paste.format(sample[1])
-  check(sample[2] .. " → fenced", is_fenced(result), "got first line: " .. (result[1] or "nil"))
+-- vim.filetype.match detects languages with strong signals (shebangs, modelines)
+do
+  local result = paste.format("#!/usr/bin/env bash\necho hello\nexit 0")
+  check("shebang → fenced", is_fenced(result))
 end
 
 do
-  -- Verify the fence contains SOME language tag (not just ```)
-  local result = paste.format("import React from 'react'\nexport default App")
-  local lang = result[1]:match("^```(.+)")
-  check("code fence has language tag", lang ~= nil and lang ~= "", "got: " .. (result[1] or "nil"))
+  local result = paste.format("#!/usr/bin/env python3\nprint('hello')")
+  check("python shebang → fenced", is_fenced(result))
 end
 
 do
-  -- Code content is preserved inside the fence
-  local result = paste.format("const x = 1\nconst y = 2")
+  local result = paste.format("#!/usr/bin/env node\nconsole.log('hi')")
+  check("node shebang → fenced", is_fenced(result))
+end
+
+-- Short snippets without shebangs: vim.filetype.match may not detect these.
+-- format() returns them as-is (passthrough or blockquote), which is correct.
+do
+  local result = paste.format("const x = 1")
+  check("short snippet → not fenced (no shebang)", not is_fenced(result))
+end
+
+-- Code inside fences: detect_language returns the fence content preserved
+do
+  local result = paste.format("#!/bin/sh\nset -e\necho done")
   if is_fenced(result) then
-    check("code content preserved", result[2] == "const x = 1")
+    check("fenced content preserved", result[2] == "#!/bin/sh")
   else
-    check("code content preserved", false, "not fenced")
+    check("fenced content preserved", false, "not fenced")
   end
 end
 
 print("\n=== smart-paste: URL detection ===")
 
 do
-  local result = paste.format("https://github.com/walis85300/claude-code-completion.nvim")
-  check("https URL → link", is_link(result), "got: " .. result[1])
-end
-
-do
-  local result = paste.format("http://localhost:3000/api/health")
-  check("http URL → link", is_link(result))
-end
-
-do
-  local result = paste.format("https://example.com not a url")
-  check("URL with space → NOT a link", not is_link(result))
-end
-
-do
-  local result = paste.format("not-a-url.com/path")
-  check("no scheme → NOT a link", not is_link(result))
+  check("https → link", is_link(paste.format("https://github.com/user/repo")))
+  check("http → link", is_link(paste.format("http://localhost:3000")))
+  check("URL with space → NOT link", not is_link(paste.format("https://example.com not url")))
+  check("no scheme → NOT link", not is_link(paste.format("example.com/path")))
+  check("multiline URL → NOT link", not is_link(paste.format("https://a.com\nhttps://b.com")))
 end
 
 print("\n=== smart-paste: blockquote ===")
 
 do
-  local long = "Line one.\nLine two.\nLine three.\nLine four.\nLine five."
+  local long = "One.\nTwo.\nThree.\nFour.\nFive."
   local result = paste.format(long)
-  check("long text → blockquoted", is_blockquoted(result))
-  check("blockquote preserves content", result[1] == "> Line one.")
+  check("5 lines → blockquoted", is_blockquoted(result))
+  check("preserves first line", result[1] == "> One.")
+  check("preserves last line", result[#result] == "> Five.")
+end
+
+do
+  local three = "One.\nTwo.\nThree."
+  local result = paste.format(three)
+  check("3 lines → NOT blockquoted", not is_blockquoted(result))
 end
 
 print("\n=== smart-paste: passthrough ===")
 
 do
-  local result = paste.format("short text")
-  check("short text passes through", #result == 1 and result[1] == "short text")
-end
-
-do
-  local result = paste.format("line one\nline two")
-  check("2 lines pass through", #result == 2 and not is_fenced(result) and not is_blockquoted(result))
-end
-
-do
-  local result = paste.format("")
-  check("empty → passthrough", #result == 1)
-end
-
-print("\n=== smart-paste: edge cases ===")
-
-do
-  local result = paste.format("  \n  \n  ")
-  check("whitespace-only passes through", #result >= 1)
+  check("short text", paste.format("hello")[1] == "hello")
+  check("2 lines", #paste.format("a\nb") == 2)
+  check("empty", #paste.format("") == 1)
+  check("whitespace-only", #paste.format("  \n  ") >= 1)
 end
 
 print(("\n  Results: %d passed, %d failed\n"):format(pass, fail))
