@@ -114,12 +114,34 @@ function M.setup(opts)
   -- Global commands
   vim.api.nvim_create_user_command("ClaudeSkillsRefresh", function()
     local scanner = require("claude-code-completion.scanner")
-    local agents = require("claude-code-completion.agents")
+    local agents_mod = require("claude-code-completion.agents")
+    local disc = require("claude-code-completion.discovery")
+
+    -- Regenerate the manifest from current state
+    local skills = {}
+    vim.list_extend(skills, require("claude-code-completion.builtins").get())
+    vim.list_extend(skills, disc.scan_all("skills"))
+    local unique = disc.dedupe(skills)
+
+    local cwd = disc.get_cwd()
+    local tmpdir = disc.get_tmpdir()
+    local hash = vim.fn.sha256(cwd):sub(1, 12)
+    local content = vim.json.encode({
+      version = 1,
+      cwd = cwd,
+      generated_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+      skills = unique,
+    })
+    for _, path in ipairs({ tmpdir .. "/claude-skills-" .. hash .. ".json", tmpdir .. "/claude-skills-latest.json" }) do
+      local f = io.open(path, "w")
+      if f then f:write(content); f:close() end
+    end
+
     scanner.refresh()
-    agents.refresh()
+    agents_mod.refresh()
     vim.notify(("Claude Code: refreshed %d skills, %d agents"):format(
-      #scanner.get_skills(), #agents.get_agents()), vim.log.levels.INFO)
-  end, { desc = "Refresh Claude Code skills and agents cache" })
+      #scanner.get_skills(), #agents_mod.get_agents()), vim.log.levels.INFO)
+  end, { desc = "Refresh Claude Code skills and agents cache + regenerate manifest" })
 
   vim.api.nvim_create_user_command("ClaudePicker", function(cmd)
     require("claude-code-completion.picker").open(cmd.args ~= "" and cmd.args or nil)
