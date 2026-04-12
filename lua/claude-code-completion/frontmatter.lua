@@ -79,9 +79,19 @@ function M.parse_skill_file(filepath)
     name = vim.fn.fnamemodify(filepath, ":t:r")
   end
 
+  local desc = fm.description or ""
+  -- Clean up: literal \n → space, strip XML/HTML tags, collapse whitespace, truncate
+  desc = desc:gsub("\\n", " ")
+  desc = desc:gsub("<[^>]+>", "")
+  desc = desc:gsub("%s+", " ")
+  desc = desc:gsub("^%s+", ""):gsub("%s+$", "")
+  if #desc > 120 then
+    desc = desc:sub(1, 117) .. "..."
+  end
+
   return {
     name = name,
-    description = fm.description or "",
+    description = desc,
   }
 end
 
