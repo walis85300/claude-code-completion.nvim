@@ -6,7 +6,12 @@
 # Install: add to ~/.claude/settings.json:
 #   "hooks": { "SessionStart": [{ "matcher": "startup", "command": "claude-skills-manifest" }] }
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Resolve symlinks to find the real plugin root (not the symlink location)
+REAL_PATH="$0"
+if command -v readlink >/dev/null 2>&1; then
+  REAL_PATH=$(readlink -f "$0" 2>/dev/null || readlink "$0" 2>/dev/null || echo "$0")
+fi
+SCRIPT_DIR="$(cd "$(dirname "$REAL_PATH")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 exec nvim --headless --clean \
