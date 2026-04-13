@@ -94,9 +94,6 @@ function M.setup(opts)
         end,
       })
 
-      -- Smart paste: auto-fence code, link URLs, blockquote long text
-      require("claude-code-completion.smart-paste").attach(ev.buf)
-
       -- Buffer-local keymaps
       local picker = require("claude-code-completion.picker")
       local nav = require("claude-code-completion.navigator")
