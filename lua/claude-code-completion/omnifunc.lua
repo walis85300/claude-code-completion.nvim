@@ -15,10 +15,12 @@ function M.complete(findstart, base)
     return slash_col and (slash_col - 1) or -3
   end
 
-  local scanner = require("claude-code-completion.scanner")
+  local host = buffer.get_host()
+  local skills = host == 'pi' and require('claude-code-completion.pi').get_skills()
+    or require('claude-code-completion.scanner').get_skills()
   local items = {}
-  for _, skill in ipairs(scanner.get_skills()) do
-    local label = "/" .. skill.name
+  for _, skill in ipairs(skills) do
+    local label = (host == 'pi' and '/skill:' or '/') .. skill.name
     if base == "" or label:find(base, 1, true) == 1 then
       items[#items + 1] = {
         word = label,

@@ -3,12 +3,20 @@ local M = {}
 
 local CLAUDE_PROMPT_PATTERN = "^claude%-prompt%-"
 
+--- Identify the external editor host without matching ordinary prompt.md files.
+function M.get_host(bufnr)
+  local name = vim.api.nvim_buf_get_name(bufnr or 0)
+  local base = vim.fn.fnamemodify(name, ':t')
+  if base:match(CLAUDE_PROMPT_PATTERN) then return 'claude' end
+  if base == 'prompt.md' and vim.fn.fnamemodify(name, ':h:t'):match('^pi%-editor%-') then return 'pi' end
+  return nil
+end
+
 --- Check if a buffer is a Claude Code prompt file.
 --- @param bufnr number|nil Buffer number (0 or nil for current)
 --- @return boolean
 function M.is_claude_buffer(bufnr)
-  local name = vim.api.nvim_buf_get_name(bufnr or 0)
-  return vim.fn.fnamemodify(name, ":t"):match(CLAUDE_PROMPT_PATTERN) ~= nil
+  return M.get_host(bufnr) == 'claude'
 end
 
 --- Find the slash-command start column in a line, or nil if not valid.

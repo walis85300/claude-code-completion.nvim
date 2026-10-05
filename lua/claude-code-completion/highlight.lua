@@ -21,17 +21,20 @@ end
 
 --- Build a set of known names for fast lookup.
 --- @return table<string, true> skills, table<string, true> agents
-local function build_known_sets()
-  local scanner = require("claude-code-completion.scanner")
-  local agents_mod = require("claude-code-completion.agents")
+local function build_known_sets(bufnr)
+  local host = require('claude-code-completion.buffer').get_host(bufnr)
+  local skills = host == 'pi' and require('claude-code-completion.pi').get_skills()
+    or require('claude-code-completion.scanner').get_skills()
+  local agents = host == 'pi' and {} or require('claude-code-completion.agents').get_agents()
 
   local skill_set = {}
-  for _, s in ipairs(scanner.get_skills()) do
-    skill_set[s.name] = true
+  for _, s in ipairs(skills) do
+    skill_set[(host == 'pi' and 'skill:' or '') .. s.name] = true
   end
+  if host == 'pi' then return skill_set, {} end
 
   local agent_set = {}
-  for _, a in ipairs(agents_mod.get_agents()) do
+  for _, a in ipairs(agents) do
     agent_set[a.name] = true
   end
 
@@ -45,7 +48,7 @@ function M.apply(bufnr)
   vim.api.nvim_buf_clear_namespace(bufnr, ns, 0, -1)
 
   local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  local skill_set, agent_set = build_known_sets()
+  local skill_set, agent_set = build_known_sets(bufnr)
 
   for i, line in ipairs(lines) do
     local row = i - 1

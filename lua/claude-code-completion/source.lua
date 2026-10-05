@@ -20,7 +20,7 @@ function source.new(opts)
 end
 
 function source:enabled()
-  return require("claude-code-completion.buffer").is_claude_buffer()
+  return require("claude-code-completion.buffer").get_host() ~= nil
 end
 
 function source:get_trigger_characters()
@@ -32,11 +32,13 @@ end
 --- @param slash_col number 1-indexed column of the `/`
 --- @return lsp.CompletionItem[]
 local function build_skill_items(ctx, slash_col)
-  local scanner = require("claude-code-completion.scanner")
+  local host = require('claude-code-completion.buffer').get_host()
+  local skills = host == 'pi' and require('claude-code-completion.pi').get_skills()
+    or require('claude-code-completion.scanner').get_skills()
   local items = {}
 
-  for _, skill in ipairs(scanner.get_skills()) do
-    local label = "/" .. skill.name
+  for _, skill in ipairs(skills) do
+    local label = (host == 'pi' and '/skill:' or '/') .. skill.name
     items[#items + 1] = {
       label = label,
       kind = CompletionItemKind.Keyword,
@@ -66,6 +68,7 @@ end
 --- @return lsp.CompletionItem[]
 local function build_at_items(ctx, at_col)
   local files_mod = require("claude-code-completion.files")
+  local host = require('claude-code-completion.buffer').get_host()
   local agents_mod = require("claude-code-completion.agents")
   local _, prefix = files_mod.find_at_col(ctx.line, ctx.cursor[2])
   local items = {}
@@ -75,7 +78,7 @@ local function build_at_items(ctx, at_col)
   }
 
   -- Agents (@agent-name)
-  for _, agent in ipairs(agents_mod.get_agents()) do
+  for _, agent in ipairs(host == 'pi' and {} or agents_mod.get_agents()) do
     local label = "@" .. agent.name
     items[#items + 1] = {
       label = label,

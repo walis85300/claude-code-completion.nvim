@@ -69,14 +69,19 @@ function M.setup(opts)
     group = group,
     pattern = "*",
     callback = function(ev)
-      if not buffer.is_claude_buffer(ev.buf) then
+      local host = buffer.get_host(ev.buf)
+      if not host then
         return
       end
 
       local now = vim.uv.now() / 1000
       if (now - last_refresh) > REFRESH_TTL_SEC then
-        require("claude-code-completion.scanner").refresh()
-        require("claude-code-completion.agents").refresh()
+        if host == 'pi' then
+          require('claude-code-completion.pi').refresh()
+        else
+          require("claude-code-completion.scanner").refresh()
+          require("claude-code-completion.agents").refresh()
+        end
         last_refresh = now
       end
 
@@ -97,8 +102,8 @@ function M.setup(opts)
       -- Buffer-local keymaps
       local picker = require("claude-code-completion.picker")
       local nav = require("claude-code-completion.navigator")
-      vim.keymap.set("n", "<leader>/", picker.skills, { buffer = ev.buf, desc = "Claude: browse skills" })
-      vim.keymap.set("n", "<leader>@", picker.mentions, { buffer = ev.buf, desc = "Claude: browse files/agents" })
+      vim.keymap.set("n", "<leader>/", picker.skills, { buffer = ev.buf, desc = "Browse skills" })
+      vim.keymap.set("n", "<leader>@", picker.mentions, { buffer = ev.buf, desc = "Browse files/agents" })
       vim.keymap.set("n", "<leader>cp", function() picker.open() end, { buffer = ev.buf, desc = "Claude: browse all" })
       vim.keymap.set("i", "<C-/>", picker.skills, { buffer = ev.buf, desc = "Claude: browse skills" })
       vim.keymap.set("i", "<C-@>", picker.mentions, { buffer = ev.buf, desc = "Claude: browse files/agents" })

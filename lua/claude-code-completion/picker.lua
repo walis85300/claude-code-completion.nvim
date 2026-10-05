@@ -22,21 +22,23 @@ local function build_entries()
   local scanner = require("claude-code-completion.scanner")
   local agents = require("claude-code-completion.agents")
   local files_mod = require("claude-code-completion.files")
+  local host = require('claude-code-completion.buffer').get_host()
+  local pi = host == 'pi' and require('claude-code-completion.pi') or nil
   local entries = {}
 
-  for _, s in ipairs(scanner.get_skills()) do
+  for _, s in ipairs(pi and pi.get_skills() or scanner.get_skills()) do
     local icon = s.source == "bundled" and ICONS.skill_bundled or ICONS.skill_known
     entries[#entries + 1] = {
-      display = string.format("%s/%s  %s  [%s]", icon, s.name, s.description, s.source),
-      insert = "/" .. s.name,
+      display = string.format("%s/%s  %s  [%s]", icon, pi and ('skill:' .. s.name) or s.name, s.description, s.source),
+      insert = pi and ('/skill:' .. s.name) or ('/' .. s.name),
       preview_text = s.description ~= "" and s.description or ("Skill: /" .. s.name),
     }
   end
 
-  for _, a in ipairs(agents.get_agents()) do
+  for _, a in ipairs(pi and pi.get_agents() or agents.get_agents()) do
     entries[#entries + 1] = {
-      display = string.format("%s@%s  %s  [%s]", ICONS.agent, a.name, a.description, a.source),
-      insert = "@" .. a.name,
+      display = string.format("%s%s%s  %s  [%s]", ICONS.agent, pi and '' or '@', a.name, a.description, a.source),
+      insert = pi and ('Use the ' .. a.name .. ' agent to ') or ('@' .. a.name),
       preview_text = a.description,
     }
   end
@@ -91,7 +93,7 @@ function M.open(filter)
   end
 
   fzf.fzf_exec(display_lines, {
-    prompt = "Claude> ",
+    prompt = require('claude-code-completion.buffer').get_host() == 'pi' and 'Pi> ' or 'Claude> ',
     query = filter or "",
     winopts = {
       title = " Skills / Agents / Files ",

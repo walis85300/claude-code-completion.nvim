@@ -1,12 +1,19 @@
 # claude-code-completion.nvim
 
-Skill and slash-command autocomplete for Neovim inside Claude Code's `Ctrl+G` editor.
+Skill and slash-command autocomplete for Neovim inside Claude Code's and Pi's `Ctrl+G` editors.
 
 Claude Code has 50+ built-in commands, bundled skills, and hundreds of plugin-provided skills. When `Ctrl+G` opens your editor, you're on your own remembering them. This plugin brings them all into your completion menu.
 
-It detects Claude Code's temp prompt buffers, discovers every available skill (built-in, user, project, and plugin), and feeds them to [blink.cmp](https://github.com/saghen/blink.cmp) — the default completion engine in LazyVim. Type `/` and see everything.
+It detects Claude Code's temp prompt buffers and Pi's `pi-editor-*/prompt.md` buffers, and feeds their respective skills to [blink.cmp](https://github.com/saghen/blink.cmp) — the default completion engine in LazyVim. Type `/` to see completions.
 
 ## Features
+
+### Pi support
+
+Press `Ctrl+G` in Pi with `$EDITOR=nvim`. In the resulting prompt buffer, `/skill:` completes Pi skills, and `@` completes project files. The picker (`<leader>cp`) also lists Pi agents; selecting one inserts a natural-language request (Pi does **not** interpret `@agent` as a native agent invocation). Save and quit Neovim to return the edited draft to Pi.
+
+Pi resource discovery scans `~/.pi/agent/skills`, `~/.agents/skills`, ancestor `.pi/skills` and `.agents/skills`, plus non-glob directories explicitly listed in `~/.pi/agent/settings.json` `skills` and installed npm packages declaring `pi.skills`. Agent discovery scans `~/.pi/agent/agents`, ancestor `.pi/agents` and `.agents` directories, and installed `pi-subagents` bundled agents. The scanner does not enumerate project settings overrides or arbitrary package sources; use Pi's native command picker for the authoritative list. No Claude manifest or Claude-only builtins are used for Pi buffers.
+
 
 - `/` completion for 50+ built-in commands and bundled skills
 - Dynamic discovery from `~/.claude/skills/`, `.claude/skills/`, and `~/.claude/plugins/`
